@@ -5,12 +5,16 @@ const { InputError, ScraperError } = require('./errors');
 
 const UNE_URL = 'https://unesonora.com/';
 
+
+const CHROMIUM_PATH =
+  process.env.CHROMIUM_PATH ||
+  process.env.PUPPETEER_EXECUTABLE_PATH;
+
 async function launchBrowser() {
   const options = { headless: true };
 
-  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-    options.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-  }
+  options.executablePath = CHROMIUM_PATH;
+  
 
   return chromium.launch(options);
 }

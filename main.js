@@ -6,8 +6,9 @@ const { watchRoute, obtenerRutas } = require('./rutas');
 const { InputError } = require('./errors');
 
 const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, 'camiones');
-const CHROMIUM_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
-  || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined);
+const CHROMIUM_PATH =
+  process.env.CHROMIUM_PATH ||
+  process.env.PUPPETEER_EXECUTABLE_PATH;
 
 function limpiarCache(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -39,17 +40,19 @@ const client = new Client({
   },
   puppeteer: {
     headless: true,
-    ...(CHROMIUM_PATH && { executablePath: CHROMIUM_PATH }),
+    executablePath: CHROMIUM_PATH,
     timeout: 60000,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--no-first-run',
+        '--no-zygote',
     ]
-  }
+}
 });
 
 client.on('qr', qr => {

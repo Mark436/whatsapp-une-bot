@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+
+  whatsapp:
+
+    build: .
+
+    container_name: whatsapp-bot
+
+    working_dir: /workspace
+
+    stdin_open: true
+    tty: true
+
+    shm_size: "2gb"
+
+    volumes:
+      - .:/workspace
+      - ./.wwebjs_auth:/workspace/.wwebjs_auth
+      - ./camiones:/workspace/camiones
+
+    environment:
+      NODE_ENV: development
+
+      CACHE_DIR: /workspace/camiones
+
+      CHROMIUM_PATH: /usr/bin/chromium
+
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium
