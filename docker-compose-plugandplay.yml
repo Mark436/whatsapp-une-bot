@@ -1,0 +1,18 @@
+services:
+  whatsapp:
+    image: mark436/whatsapp-une-bot:latest
+    container_name: whatsapp-bot
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    shm_size: '2gb'
+
+    volumes:
+      - ./.wwebjs_auth:/workspace/.wwebjs_auth
+      - ./camiones:/workspace/camiones
+
+    environment:
+      NODE_ENV: development
+      CACHE_DIR: /workspace/camiones
+
+    command: pnpm start
