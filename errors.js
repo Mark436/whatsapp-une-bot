@@ -1,7 +1,7 @@
 class InputError extends Error {
-  constructor(message, { visible = false, rutas = '' } = {}) {
+  constructor(message, { visible = false, rutas = "" } = {}) {
     super(message);
-    this.name = 'InputError';
+    this.name = "InputError";
     this.visible = visible;
     this.rutas = rutas;
   }
@@ -10,7 +10,7 @@ class InputError extends Error {
 class ScraperError extends Error {
   constructor(message, { cause } = {}) {
     super(message);
-    this.name = 'ScraperError';
+    this.name = "ScraperError";
     this.cause = cause;
   }
 }
