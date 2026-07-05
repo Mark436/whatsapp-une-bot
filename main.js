@@ -1,11 +1,16 @@
-const path = require('path')
-const { Client, LocalAuth } = require('whatsapp-web.js')
-const qrcode = require('qrcode-terminal')
-const logger = require('./logger')
-const { limpiarDirectorio } = require('./utils')
-const { handleCommands } = require('./commands')
-const { closeBrowser } = require('./playwrightManager')
+import path from 'path'
+import { fileURLToPath } from 'url'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+import qrcode from 'qrcode-terminal'
+import logger from './logger.js'
+import { limpiarDirectorio } from './utils.js'
+import { handleCommands } from './commands.js'
+import { closeBrowser } from './playwrightManager.js'
+import whatsappWebPackage from 'whatsapp-web.js'
+const { Client, LocalAuth } = whatsappWebPackage
 const CACHE_DIR_IMAGES = path.join(__dirname, 'camiones')
 
 // Limpiar basura anterior al arrancar

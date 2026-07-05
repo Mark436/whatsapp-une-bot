@@ -14,7 +14,7 @@ function getTimestamp() {
   return `[${date} ${time}]`
 }
 
-export const logger = {
+const logger = {
   info: (message) => {
     console.log(`${getTimestamp()} [INFO] ${message}`)
   },
@@ -28,3 +28,4 @@ export const logger = {
     }
   },
 }
+export default logger

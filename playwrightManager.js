@@ -1,5 +1,5 @@
-const { chromium } = require('playwright')
-const logger = require('./logger')
+import { chromium } from 'playwright'
+import logger from './logger.js'
 
 let browserInstance = null
 let pageInstance = null
@@ -37,7 +37,4 @@ process.on('SIGTERM', async () => {
   process.exit(0)
 })
 
-module.exports = {
-  getBrowserPage,
-  closeBrowser,
-}
+export { getBrowserPage, closeBrowser }

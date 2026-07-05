@@ -1,6 +1,9 @@
-const fs = require('fs')
-const path = require('path')
-const logger = require('./logger')
+import fs from 'fs'
+import path from 'path'
+import logger from './logger.js'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, '.cache')
 const CACHE_FILE = path.join(CACHE_DIR, 'rutas.json')
@@ -46,8 +49,4 @@ function clearCache() {
   }
 }
 
-module.exports = {
-  getRutas,
-  setRutas,
-  clearCache,
-}
+export { getRutas, setRutas, clearCache }

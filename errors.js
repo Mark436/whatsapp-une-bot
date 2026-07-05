@@ -1,4 +1,4 @@
-class InputError extends Error {
+export class InputError extends Error {
   constructor(message, { visible = false, rutas = '' } = {}) {
     super(message)
     this.name = 'InputError'
@@ -7,12 +7,10 @@ class InputError extends Error {
   }
 }
 
-class ScraperError extends Error {
+export class ScraperError extends Error {
   constructor(message, { cause } = {}) {
     super(message)
     this.name = 'ScraperError'
     this.cause = cause
   }
 }
-
-module.exports = { InputError, ScraperError }

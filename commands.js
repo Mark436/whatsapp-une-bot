@@ -1,9 +1,11 @@
-import { MessageMedia } from 'whatsapp-web.js'
-import logger from './logger'
-import { watchRoute, obtenerRutas } from './routeService'
-import { clearCache } from './routeCache'
-import { eliminarArchivo } from './utils'
-import { InputError } from './errors'
+import whatsappWebPackage from 'whatsapp-web.js'
+import logger from './logger.js'
+import { watchRoute, obtenerRutas } from './routeService.js'
+import { clearCache } from './routeCache.js'
+import { eliminarArchivo } from './utils.js'
+import { InputError } from './errors.js'
+
+const { MessageMedia } = whatsappWebPackage
 
 async function extraerInfoContacto(msg) {
   try {

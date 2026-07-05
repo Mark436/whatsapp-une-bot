@@ -1,11 +1,11 @@
-const fs = require('fs')
-const path = require('path')
-const logger = require('./logger')
+import fs from 'fs'
+import path from 'path'
+import logger from './logger.js'
 
 /**
  * Cola FIFO para asegurar que las tareas se ejecuten una por una.
  */
-class FIFOQueue {
+export class FIFOQueue {
   constructor() {
     this.queue = Promise.resolve()
   }
@@ -27,7 +27,7 @@ class FIFOQueue {
 /**
  * Elimina archivos temporales de un directorio específico
  */
-function limpiarDirectorio(dir, extension = '.jpg') {
+export function limpiarDirectorio(dir, extension = '.jpg') {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true })
     return
@@ -56,7 +56,7 @@ function limpiarDirectorio(dir, extension = '.jpg') {
 /**
  * Elimina un solo archivo de forma segura
  */
-function eliminarArchivo(filePath) {
+export function eliminarArchivo(filePath) {
   if (!filePath) return
 
   fs.unlink(filePath, (err) => {
@@ -66,10 +66,4 @@ function eliminarArchivo(filePath) {
       logger.info(`Archivo temporal eliminado: ${filePath}`)
     }
   })
-}
-
-module.exports = {
-  FIFOQueue,
-  limpiarDirectorio,
-  eliminarArchivo,
 }

@@ -1,10 +1,14 @@
 import path from 'path'
-import logger from './logger'
-import playwrightManager from './playwrightManager'
-import routeCache from './routeCache'
-import { InputError, ScraperError } from './errors'
+import { fileURLToPath } from 'url'
 
-import { FIFOQueue } from './utils'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+import logger from './logger.js'
+import { getBrowserPage } from './playwrightManager.js'
+import { getRutas, setRutas } from './routeCache.js'
+import { InputError, ScraperError } from './errors.js'
+
+import { FIFOQueue } from './utils.js'
 
 const UNE_URL = 'https://unesonora.com/'
 const IMAGES_DIR = path.join(__dirname, 'camiones')
@@ -14,11 +18,9 @@ const taskQueue = new FIFOQueue()
 
 /**
  * Acepta el modal de privacidad si aparece
- */
-/**
+ *
  * Acepta el modal de privacidad si aparece o lo destruye a la fuerza
- */
-/**
+ *
  * Espera y acepta el modal de privacidad siguiendo el flujo natural de la web
  */
 async function aceptarPrivacidad(page) {
@@ -73,7 +75,7 @@ async function extraerNombresRutas(page) {
  */
 async function _scrapeRutas() {
   logger.info('Inicio del scraper: extrayendo lista de rutas')
-  const page = await playwrightManager.getBrowserPage()
+  const page = await getBrowserPage()
 
   try {
     await prepararPagina(page)
@@ -103,12 +105,12 @@ function limpiarTextoBusqueda(texto) {
  * Si encuentra varias, pide aclaración. Si encuentra una, devuelve el nombre exacto.
  */
 async function buscarRutaExacta(inputUsuario) {
-  let rutasDisponibles = routeCache.getRutas()
+  let rutasDisponibles = getRutas()
 
   // Si no hay caché, descargar las rutas primero
   if (!rutasDisponibles || rutasDisponibles.length === 0) {
     rutasDisponibles = await _scrapeRutas()
-    routeCache.setRutas(rutasDisponibles)
+    setRutas(rutasDisponibles)
   }
 
   const inputLimpio = limpiarTextoBusqueda(inputUsuario)
@@ -146,17 +148,17 @@ async function buscarRutaExacta(inputUsuario) {
 /**
  * Obtiene las rutas (usa caché si está disponible, a menos que force = true)
  */
-async function obtenerRutas(force = false) {
+export async function obtenerRutas(force = false) {
   return taskQueue.add(async () => {
     if (!force) {
-      const cached = routeCache.getRutas()
+      const cached = getRutas()
       if (cached && cached.length > 0) {
         return cached.map((r) => `• ${r}`).join('\n')
       }
     }
 
     const rutas = await _scrapeRutas()
-    routeCache.setRutas(rutas)
+    setRutas(rutas)
     return rutas.map((r) => `• ${r}`).join('\n')
   })
 }
@@ -164,7 +166,7 @@ async function obtenerRutas(force = false) {
 /**
  * Toma screenshot de una ruta específica
  */
-async function watchRoute(ruta) {
+export async function watchRoute(ruta) {
   return taskQueue.add(async () => {
     logger.info(`Inicio del scraper: procesando solicitud para "${ruta}"`)
 
@@ -172,7 +174,7 @@ async function watchRoute(ruta) {
     const nombreRutaExacto = await buscarRutaExacta(ruta)
     logger.info(`Match encontrado en caché: "${nombreRutaExacto}"`)
 
-    const page = await playwrightManager.getBrowserPage()
+    const page = await getBrowserPage()
 
     try {
       await prepararPagina(page)
@@ -192,7 +194,7 @@ async function watchRoute(ruta) {
       if (!existe) {
         logger.warn(`Cuando falla una ruta: Ruta "${nombreRutaExacto}" no encontrada en el DOM`)
         const rutasActualizadas = await extraerNombresRutas(page)
-        routeCache.setRutas(rutasActualizadas)
+        setRutas(rutasActualizadas)
 
         throw new InputError(
           `Ruta "${nombreRutaExacto}" no encontrada actualmente en el sistema.`,
@@ -220,9 +222,4 @@ async function watchRoute(ruta) {
       throw new ScraperError(`Error al capturar la ruta "${nombreRutaExacto}"`, { cause: error })
     }
   })
-}
-
-module.exports = {
-  obtenerRutas,
-  watchRoute,
 }
