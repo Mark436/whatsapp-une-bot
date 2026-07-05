@@ -1,13 +1,7 @@
-version: "3.9"
-
 services:
-
   whatsapp:
-
     build: .
-
     container_name: whatsapp-bot
-
     working_dir: /workspace
 
     stdin_open: true
@@ -17,16 +11,12 @@ services:
 
     volumes:
       - .:/workspace
+      - /workspace/node_modules   # evita que el bind mount pise node_modules del contenedor
       - ./.wwebjs_auth:/workspace/.wwebjs_auth
       - ./camiones:/workspace/camiones
 
     environment:
       NODE_ENV: development
-
       CACHE_DIR: /workspace/camiones
 
-      CHROMIUM_PATH: /usr/bin/chromium
-
-      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
-
-      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium
+    command: sleep infinity

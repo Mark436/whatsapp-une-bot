@@ -1,0 +1,18 @@
+{
+    "name": "WhatsApp Bot Dev",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "whatsapp",
+    "workspaceFolder": "/workspace",
+  
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "dbaeumer.vscode-eslint",
+          "esbenp.prettier-vscode"
+        ]
+      }
+    },
+  
+    "postCreateCommand": "pnpm install --unsafe-perm",
+    "remoteUser": "root"
+  }

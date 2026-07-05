@@ -1,3 +1,5 @@
+console.log('HOLA')
+
 const fs = require('fs');
 const path = require('path');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
@@ -6,9 +8,6 @@ const { watchRoute, obtenerRutas } = require('./rutas');
 const { InputError } = require('./errors');
 
 const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, 'camiones');
-const CHROMIUM_PATH =
-  process.env.CHROMIUM_PATH ||
-  process.env.PUPPETEER_EXECUTABLE_PATH;
 
 function limpiarCache(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -34,26 +33,23 @@ limpiarCache(CACHE_DIR);
 
 const client = new Client({
   authStrategy: new LocalAuth(),
-  webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-  },
+
+  // ✅ FIX PRINCIPAL: eliminar webVersionCache
+
   puppeteer: {
-    headless: true,
-    executablePath: CHROMIUM_PATH,
+    headless: 'new',
     timeout: 60000,
     args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-extensions',
-        '--disable-background-networking',
-        '--no-first-run',
-        '--no-zygote',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--no-first-run",
+      "--no-zygote",
     ]
-}
+  }
 });
+
+// ---------------- EVENTS ----------------
 
 client.on('qr', qr => {
   qrcode.generate(qr, { small: true });
@@ -80,6 +76,8 @@ client.on('disconnected', reason => {
   console.warn('⚠️ Bot desconectado:', reason);
 });
 
+// ---------------- MESSAGES ----------------
+
 client.on('message', async msg => {
   const body = msg.body.trim();
   const lower = body.toLowerCase();
@@ -103,6 +101,7 @@ client.on('message', async msg => {
       await client.sendMessage(msg.from, media, {
         caption: `🚌 Ruta *${ruta}* - Estado actual`,
       });
+
     } catch (error) {
       if (error instanceof InputError && error.visible) {
         await msg.reply(
@@ -115,6 +114,7 @@ client.on('message', async msg => {
     } finally {
       eliminarArchivo(filePath);
     }
+
     return;
   }
 
@@ -128,6 +128,7 @@ client.on('message', async msg => {
       console.error('[Bot] Error en !rutas:', error);
       await msg.reply('⚠️ No se pudo obtener la lista de rutas. Intenta más tarde.');
     }
+
     return;
   }
 
@@ -157,8 +158,10 @@ client.on('message', async msg => {
         `⚠️ No se pudo cargar la lista de rutas en este momento. Usa *!rutas* más tarde.`
       );
     }
+
     return;
   }
 });
-
-client.initialize();
+setTimeout(()=>{
+  client.initialize();
+},10000)

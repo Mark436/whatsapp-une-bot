@@ -11,8 +11,10 @@ RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
+RUN corepack enable
 
-run pnpm install
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
+RUN cat pnpm-workspace.yaml
+RUN pnpm install --dangerously-allow-all-builds
 
-CMD ["bash"]
+CMD ["pnpm", "dev"]
