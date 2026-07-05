@@ -17,4 +17,4 @@ COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 RUN cat pnpm-workspace.yaml
 RUN pnpm install --dangerously-allow-all-builds
 
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "start"]
