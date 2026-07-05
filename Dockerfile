@@ -17,6 +17,7 @@ FROM base AS runtime
 COPY --from=dependencies /workspace/node_modules ./node_modules
 COPY --from=dependencies /workspace/package.json ./
 COPY --from=dependencies /workspace/pnpm-lock.yaml* ./
+COPY --from=dependencies /root/.cache/puppeteer /root/.cache/puppeteer
 
 COPY . .
 
