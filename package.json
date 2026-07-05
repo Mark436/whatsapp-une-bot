@@ -1,19 +1,19 @@
 {
   "name": "whatsapp-une-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp automation bot",
+  "private": false,
+  "type": "module",
   "main": "main.js",
   "scripts": {
+    "start": "node main.js",
+    "dev": "node --watch main.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "validate": "pnpm lint && pnpm format:check"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "playwright": "1.54.2",
     "qrcode-terminal": "0.12.0",
