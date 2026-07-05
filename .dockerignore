@@ -1,0 +1,9 @@
+node_modules
+.wwebjs_auth
+.wwebjs_cache
+camiones
+.git
+.gitignore
+*.log
+.env
+.env.*

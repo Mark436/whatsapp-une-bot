@@ -1,58 +1,103 @@
 const { chromium } = require('playwright');
-const {InputError}=require('../parts/errores.js')
+const fs = require('fs');
+const path = require('path');
+const { InputError, ScraperError } = require('./errors');
 
-async function obtenerRutas(evaluating) {
-  const browser = await chromium.launch();
+const UNE_URL = 'https://unesonora.com/';
+
+async function launchBrowser() {
+  const options = { headless: true };
+
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    options.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+
+  return chromium.launch(options);
+}
+
+async function aceptarPrivacidad(page) {
+  const btn = page.getByRole('button', { name: 'He leído y acepto el Aviso de Privacidad' });
+  if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await btn.click();
+  }
+}
+
+async function abrirSelectorRutas(page) {
+  await page.goto(UNE_URL);
+  await aceptarPrivacidad(page);
+  await page.waitForSelector('.btn-selectroute', { timeout: 15000 });
+  await page.click('.btn-selectroute');
+  await page.waitForSelector('.mapRoutesSidebar_body-list__1sd3l', { timeout: 15000 });
+}
+
+async function extraerNombresRutas(page) {
+  const botones = page.locator('.mapRoutesSidebar_body-list__1sd3l li button');
+  const count = await botones.count();
+  const rutas = [];
+
+  for (let i = 0; i < count; i++) {
+    const texto = (await botones.nth(i).textContent()).trim();
+    rutas.push(texto);
+  }
+
+  return rutas;
+}
+
+async function obtenerRutas() {
+  const browser = await launchBrowser();
   const page = await browser.newPage();
 
   try {
-    // Ir a la página web
-    await page.goto('https://unesonora.com/');
-    
-    // Obtener todos los elementos <li> dentro del <ul>
-    const listItems = await page.$$('ul.mapRoutesSidebar_body-list__1sd3l > li');
-    let rutas='';
-    // Recorrer cada elemento <li> para obtener el texto del botón
-    for (const li in listItems) {
-      const buttonText = await listItems[li].$eval('button', (button) => button.textContent)
-      if(buttonText.toLowerCase()==evaluating.toLowerCase())return buttonText
-      rutas+=buttonText+"\n"
-      if(li==listItems.length-1)return rutas
-    }
+    await abrirSelectorRutas(page);
+    const rutas = await extraerNombresRutas(page);
+    return rutas.map(r => `• ${r}`).join('\n');
   } catch (error) {
-    console.error('Error:', error);
+    throw new ScraperError('No se pudo obtener la lista de rutas', { cause: error });
   } finally {
     await browser.close();
   }
 }
-async function watchRoute(ruta,path="./camiones/") {
-  const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const fileName=ruta+".jpg"
-  const rout=`${path}${ruta}.jpg`;
+
+function normalizarRuta(input) {
+  const match = String(input).match(/\d+/);
+  return match ? match[0] : input.trim();
+}
+
+async function watchRoute(ruta, outputDir = './camiones/') {
+  const rutaNormalizada = normalizarRuta(ruta);
+  const fileName = `${rutaNormalizada}.jpg`;
+  const filePath = path.join(outputDir, fileName);
+
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  const browser = await launchBrowser();
+  const page = await browser.newPage();
+
   try {
-    await page.goto("https://unesonora.com/");
-    await page.getByRole("button",{name:"He leído y acepto el Aviso de Privacidad"}).click()
-    await page.waitForSelector(".btn-selectroute")
-    await page.click(".btn-selectroute")
-    await page.waitForSelector(".mapRoutesSidebar_body-list__1sd3l")
-    await page.getByRole("button",{name:`Línea ${ruta}`}).click()
-    await page.waitForSelector(".busMarker")
-    await page.screenshot({ path:rout });
-    return fileName
-  } catch (error) {
-    if(error.message.startsWith("locator.click")){
-      const errorResult=await obtenerRutas(ruta);
-      if(errorResult?.toLowerCase()==ruta.toLowerCase()){
-        browser.close()
-        return watchRoute(errorResult,path)
-      }
-      throw new InputError("No definiste bien el nombre de la ruta",{visible:true,return:errorResult})
+    await abrirSelectorRutas(page);
+
+    const botonRuta = page.getByRole('button', { name: `Línea ${rutaNormalizada}` });
+    const existe = await botonRuta.isVisible({ timeout: 5000 }).catch(() => false);
+
+    if (!existe) {
+      const rutas = await extraerNombresRutas(page);
+      throw new InputError(`Ruta "${ruta}" no encontrada`, {
+        visible: true,
+        rutas: rutas.map(r => `• ${r}`).join('\n'),
+      });
     }
-    throw error
+
+    await botonRuta.click();
+    await page.waitForSelector('.busMarker', { timeout: 15000 });
+    await page.screenshot({ path: filePath });
+
+    return filePath;
+  } catch (error) {
+    if (error instanceof InputError) throw error;
+    throw new ScraperError(`Error al capturar ruta "${ruta}"`, { cause: error });
   } finally {
     await browser.close();
   }
 }
-module.exports={watchRoute}
+
+module.exports = { watchRoute, obtenerRutas };
