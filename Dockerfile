@@ -13,6 +13,6 @@ RUN apt-get update && apt-get install -y \
 
 COPY package*.json ./
 
-CMD ["npm", "install"]
+run pnpm install
 
 CMD ["bash"]
