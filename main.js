@@ -1,15 +1,15 @@
-const path = require("path");
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
-const logger = require("./logger");
-const { limpiarDirectorio } = require("./utils");
-const { handleCommands } = require("./commands");
-const { closeBrowser } = require("./playwrightManager");
+const path = require('path')
+const { Client, LocalAuth } = require('whatsapp-web.js')
+const qrcode = require('qrcode-terminal')
+const logger = require('./logger')
+const { limpiarDirectorio } = require('./utils')
+const { handleCommands } = require('./commands')
+const { closeBrowser } = require('./playwrightManager')
 
-const CACHE_DIR_IMAGES = path.join(__dirname, "camiones");
+const CACHE_DIR_IMAGES = path.join(__dirname, 'camiones')
 
 // Limpiar basura anterior al arrancar
-limpiarDirectorio(CACHE_DIR_IMAGES, ".jpg");
+limpiarDirectorio(CACHE_DIR_IMAGES, '.jpg')
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -17,62 +17,60 @@ const client = new Client({
     headless: true,
     timeout: 60000,
     args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--no-first-run",
-      "--no-zygote",
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--no-first-run',
+      '--no-zygote',
     ],
   },
-});
+})
 
-logger.info(
-  "Cuando se inicia el bot: Inicializando instancia de WhatsApp Web...",
-);
+logger.info('Cuando se inicia el bot: Inicializando instancia de WhatsApp Web...')
 
 // ---------------- EVENTS ----------------
 
-client.on("qr", (qr) => {
-  logger.info("QR generado, esperando escaneo...");
-  qrcode.generate(qr, { small: true });
-  console.log("\n📱 Escanea el QR superior con tu aplicación de WhatsApp");
-});
+client.on('qr', (qr) => {
+  logger.info('QR generado, esperando escaneo...')
+  qrcode.generate(qr, { small: true })
+  console.warn('\n📱 Escanea el QR superior con tu aplicación de WhatsApp')
+})
 
-client.on("loading_screen", (percent, message) => {
-  logger.info(`Cargando WhatsApp: ${percent}% - ${message}`);
-});
+client.on('loading_screen', (percent, message) => {
+  logger.info(`Cargando WhatsApp: ${percent}% - ${message}`)
+})
 
-client.on("authenticated", () => {
-  logger.info("Cuando se autentica WhatsApp: Autenticación exitosa.");
-});
+client.on('authenticated', () => {
+  logger.info('Cuando se autentica WhatsApp: Autenticación exitosa.')
+})
 
-client.on("auth_failure", (msg) => {
-  logger.error(`Error crítico de autenticación en WhatsApp: ${msg}`);
-});
+client.on('auth_failure', (msg) => {
+  logger.error(`Error crítico de autenticación en WhatsApp: ${msg}`)
+})
 
-client.on("ready", () => {
-  logger.info("WhatsApp Bot listo y escuchando mensajes.");
-});
+client.on('ready', () => {
+  logger.info('WhatsApp Bot listo y escuchando mensajes.')
+})
 
-client.on("disconnected", (reason) => {
-  logger.warn(`Cuando se desconecta: Bot desconectado por la razón: ${reason}`);
-});
+client.on('disconnected', (reason) => {
+  logger.warn(`Cuando se desconecta: Bot desconectado por la razón: ${reason}`)
+})
 
 // ---------------- MESSAGES ----------------
 
-client.on("message_create", async (msg) => {
+client.on('message_create', async (msg) => {
   try {
-    await handleCommands(msg, client);
+    await handleCommands(msg)
   } catch (error) {
-    logger.error("Error crítico no manejado al procesar mensaje", error.stack);
+    logger.error('Error crítico no manejado al procesar mensaje', error.stack)
   }
-});
+})
 
 // Manejo de apagado correcto del bot
-process.on("SIGINT", async () => {
-  logger.info("Apagando bot manualmente...");
-  await closeBrowser();
-  process.exit(0);
-});
+process.on('SIGINT', async () => {
+  logger.info('Apagando bot manualmente...')
+  await closeBrowser()
+  process.exit(0)
+})
 
-client.initialize();
+client.initialize()
