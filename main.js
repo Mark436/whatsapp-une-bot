@@ -10,17 +10,18 @@ import { limpiarDirectorio } from './utils.js'
 import { handleCommands } from './commands.js'
 import { closeBrowser } from './playwrightManager.js'
 import whatsappWebPackage from 'whatsapp-web.js'
+import { chromium } from 'playwright'
 const { Client, LocalAuth } = whatsappWebPackage
 const CACHE_DIR_IMAGES = path.join(__dirname, 'camiones')
-
+whatsappWebPackage.ClientOptions
 // Limpiar basura anterior al arrancar
 limpiarDirectorio(CACHE_DIR_IMAGES, '.jpg')
-
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
     timeout: 60000,
+    executablePath: chromium.executablePath(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
