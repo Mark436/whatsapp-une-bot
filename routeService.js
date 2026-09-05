@@ -1,89 +1,38 @@
 import path from 'path'
 import { fileURLToPath } from 'url'
+import sharp from 'sharp'
+import { UneApiClient } from 'une-api-client'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import logger from './logger.js'
-import { getBrowserPage } from './playwrightManager.js'
 import { getRutas, setRutas } from './routeCache.js'
 import { InputError, ScraperError } from './errors.js'
+import { rutaASvg } from './svgMapa.js'
 
 import { FIFOQueue } from './utils.js'
 
-const UNE_URL = 'https://unesonora.com/'
 const IMAGES_DIR = path.join(__dirname, 'camiones')
+const DIMENSIONES_MAPA = { width: 1200, height: 900 }
 
-// Inicializa la cola FIFO para que todas las operaciones de scraping sean 1 por 1
+// Cliente único de la API de UNE (auth anónima de Firebase automática).
+const client = new UneApiClient()
+
+// Inicializa la cola FIFO para que todas las operaciones sean 1 por 1
 const taskQueue = new FIFOQueue()
 
 /**
- * Acepta el modal de privacidad si aparece
- *
- * Acepta el modal de privacidad si aparece o lo destruye a la fuerza
- *
- * Espera y acepta el modal de privacidad siguiendo el flujo natural de la web
+ * Obtiene todas las rutas desde la API de UNE (listarRutas -> nombres).
  */
-async function aceptarPrivacidad(page) {
-  const boton = page.getByRole('button', {
-    name: 'He leído y acepto el Aviso de Privacidad',
-  })
-  const modal = page.locator('[data-testid="TermsModal"]')
-  // Usamos el selector exacto que te dio el error en los logs
-  const backdrop = page.locator('.modalBase_backdrop__3Y-Zy')
-
+async function _listarRutasDesdeApi() {
+  logger.info('Inicio: descargando lista de rutas de la API de UNE')
   try {
-    // 1. Damos 3 segundos para que aparezca el botón (por si la conexión es lenta)
-    await boton.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
-
-    if (await boton.isVisible()) {
-      // 2. Hacemos clic. Usamos force por si hay animaciones ejecutándose
-      await boton.click({ force: true })
-
-      // 3. Esperamos estrictamente a que el modal y su fondo gris desaparezcan
-      await modal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-      await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-
-      // 4. Una pausa minúscula de seguridad para asegurar que el DOM se estabilizó
-      await page.waitForTimeout(500)
-    }
+    const rutas = await client.listarRutas()
+    const nombres = rutas.map((r) => r.nombre)
+    logger.info(`Fin: ${nombres.length} rutas encontradas desde la API`)
+    return nombres
   } catch (error) {
-    console.error(error)
-  }
-}
-/**
- * Abre la página y espera a que estén disponibles las rutas
- */
-async function prepararPagina(page) {
-  await page.goto(UNE_URL, { waitUntil: 'domcontentloaded' })
-  await aceptarPrivacidad(page)
-  await page.waitForSelector('.mapRoutesSidebar_body-list__1sd3l li button', {
-    timeout: 15000,
-  })
-}
-
-/**
- * Obtiene todas las rutas visibles
- */
-async function extraerNombresRutas(page) {
-  return page
-    .locator('.mapRoutesSidebar_body-list__1sd3l li button')
-    .evaluateAll((btns) => btns.map((btn) => btn.textContent.trim()).filter(Boolean))
-}
-
-/**
- * Tarea privada: forzar scrapeo de rutas
- */
-async function _scrapeRutas() {
-  logger.info('Inicio del scraper: extrayendo lista de rutas')
-  const page = await getBrowserPage()
-
-  try {
-    await prepararPagina(page)
-    const rutas = await extraerNombresRutas(page)
-    logger.info(`Fin del scraper: ${rutas.length} rutas encontradas`)
-    return rutas
-  } catch (error) {
-    throw new ScraperError('No se pudo obtener la lista de rutas del sitio', {
+    throw new ScraperError('No se pudo obtener la lista de rutas de la API', {
       cause: error,
     })
   }
@@ -109,7 +58,7 @@ async function buscarRutaExacta(inputUsuario) {
 
   // Si no hay caché, descargar las rutas primero
   if (!rutasDisponibles || rutasDisponibles.length === 0) {
-    rutasDisponibles = await _scrapeRutas()
+    rutasDisponibles = await _listarRutasDesdeApi()
     setRutas(rutasDisponibles)
   }
 
@@ -157,69 +106,56 @@ export async function obtenerRutas(force = false) {
       }
     }
 
-    const rutas = await _scrapeRutas()
+    const rutas = await _listarRutasDesdeApi()
     setRutas(rutas)
     return rutas.map((r) => `• ${r}`).join('\n')
   })
 }
 
 /**
- * Toma screenshot de una ruta específica
+ * Genera el mapa (SVG -> PNG) de una ruta consultando la API de UNE.
  */
 export async function watchRoute(ruta) {
   return taskQueue.add(async () => {
-    logger.info(`Inicio del scraper: procesando solicitud para "${ruta}"`)
+    logger.info(`Inicio: procesando solicitud para "${ruta}"`)
 
-    // Obtenemos el nombre tal cual está en la web (case sensitive) sin abrir el DOM
+    // Obtenemos el nombre tal cual está en la API (case sensitive) sin abrir el DOM
     const nombreRutaExacto = await buscarRutaExacta(ruta)
     logger.info(`Match encontrado en caché: "${nombreRutaExacto}"`)
 
-    const page = await getBrowserPage()
-
     try {
-      await prepararPagina(page)
+      logger.info(`Cuando una ruta se encuentra: Consultando datos de "${nombreRutaExacto}"`)
+      const info = await client.consultarRuta(nombreRutaExacto)
 
-      const botonMenuVerRutas = await page.locator('button:has-text("Ver una línea")')
-      if (await botonMenuVerRutas.isVisible().catch(() => false)) {
-        await botonMenuVerRutas.click()
-        await page.waitForTimeout(1000) // Esperamos 1 segundo a que la barra lateral termine de deslizarse
-      }
-
-      // Usamos text-is para que Playwright busque el botón con el texto idéntico y exacto
-      const botonRuta = page.locator(
-        `.mapRoutesSidebar_body-list__1sd3l button:text-is("${nombreRutaExacto}")`
-      )
-      const existe = await botonRuta.count()
-
-      if (!existe) {
-        logger.warn(`Cuando falla una ruta: Ruta "${nombreRutaExacto}" no encontrada en el DOM`)
-        const rutasActualizadas = await extraerNombresRutas(page)
-        setRutas(rutasActualizadas)
-
+      if (!info) {
+        const rutasDisponibles = getRutas() ?? (await _listarRutasDesdeApi())
         throw new InputError(
           `Ruta "${nombreRutaExacto}" no encontrada actualmente en el sistema.`,
           {
             visible: true,
-            rutas: rutasActualizadas.map((r) => `• ${r}`).join('\n'),
+            rutas: rutasDisponibles.map((r) => `• ${r}`).join('\n'),
           }
         )
       }
 
-      logger.info(`Cuando una ruta se encuentra: Preparando captura para "${nombreRutaExacto}"`)
-      await botonRuta.first().click()
-      await page.waitForTimeout(3000) // Dar tiempo a marcadores y trazado en el mapa
+      logger.info(
+        `paradas: ${info.paradas.length} | unidades: ${info.camiones.length} | recorrido: ${info.ruta.recorrido.length} pts`
+      )
 
+      const svg = rutaASvg(info.ruta, info.paradas, info.camiones, DIMENSIONES_MAPA)
       const filePath = path.join(
         IMAGES_DIR,
-        `${nombreRutaExacto.replace(/\s+/g, '_')}_${Date.now()}.jpg`
+        `${nombreRutaExacto.replace(/\s+/g, '_')}_${Date.now()}.png`
       )
-      await page.screenshot({ path: filePath, fullPage: true })
+      await sharp(Buffer.from(svg)).png().toFile(filePath)
 
-      logger.info(`Fin del scraper: captura guardada temporalmente en ${filePath}`)
+      logger.info(`Fin: mapa generado temporalmente en ${filePath}`)
       return filePath
     } catch (error) {
       if (error instanceof InputError) throw error
-      throw new ScraperError(`Error al capturar la ruta "${nombreRutaExacto}"`, { cause: error })
+      throw new ScraperError(`Error al generar el mapa de "${nombreRutaExacto}"`, {
+        cause: error,
+      })
     }
   })
 }
