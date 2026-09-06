@@ -8,8 +8,11 @@ con `sharp` al responder un comando `!ruta`.
 
 ## 1. Dónde vive
 
-- **Generador**: `svgMapa.js` → `rutaASvg(ruta, paradas, camiones, dimensiones?)`
-  (función pura, sin dependencias).
+- **Generador**: `svgMapa.js` → `rutaASvg(ruta, paradas, camiones, dimensiones?,
+opciones?)` (función pura, sin dependencias).
+- **Fondo de calles**: `mapaTiles.js` → `obtenerTilesBase(puntos, dimensiones)`
+  baja tiles Web Mercator (Esri World Street Map, respaldo OSM) con caché en
+  `camiones/tiles/` y devuelve la capa `base` de `<image>` para el SVG.
 - **Quién lo usa**:
   - `routeService.js` → `watchRoute()` (flujo del bot por WhatsApp).
   - `scripts/probar-mapa.js` → smoke test que guarda `.svg` + `.png` en
@@ -36,22 +39,24 @@ con `sharp` al responder un comando `!ruta`.
 
 ### 3.1 Proyección (`proyectar()`)
 
-Proyección **equirectangular simple** lat/lng → píxeles:
+Proyección **Web Mercator** (la misma de los tiles OSM/Esri) lat/lng → píxeles:
 
-1. Se toman los **mínimos/máximos** de lat y lng de _todos_ los puntos
-   (recorrido + paradas + unidades).
-2. Corrección por `cos` de la latitud media (para no distorsionar la
-   proporción al acercarse a Hermosillo).
-3. Escala única con `Math.min` para que todo el conjunto quepa en el canvas
-   menos el `MARGEN` de 30 px.
+1. Se normalizan los puntos a Mercator (`mercatorX`/`mercatorY`, en `[0,1]`).
+2. `ajustarEscala()` calcula la escala + offsets para que el bbox de _todos_
+   los puntos (recorrido + paradas + unidades) quepa en el canvas menos el
+   `MARGEN` de 30 px.
+3. Con esa misma transformación, `mapaTiles.js` posiciona cada tile de fondo:
+   los rectángulos de las `<image>` coinciden exactamente con la geometría.
 
-Consecuencia: **no hay mapa base de calles**; el lienzo se autocontiene
-alrededor del recorrido de la ruta.
+Consecuencia: se puede (y por defecto se hace) dibujar un **mapa base de
+calles** debajo del recorrido; el lienzo ya no se autocontiene.
 
 ### 3.2 Capas dibujadas (orden z)
 
-1. Fondo: `<rect>` `#eef3f8`.
-2. Título: `ruta.nombre`, centrado arriba (`y=18`).
+1. Fondo: `<image>` por tile (data URI) si `opciones.base` trae capas, o
+   `<rect>` `#eef3f8` si no hay fondo (cae al modo plano).
+2. Título: `ruta.nombre`, centrado arriba (`y=18`), con halo `#eef3f8` para
+   leerse sobre el mapa.
 3. Recorrido: `<path>` con **"M"** en el primer punto y **"L"** en el resto,
    `fill="none"`, `stroke` = `ruta.colorPrimario` (o `#0088ff` por defecto),
    grosor 5, extremos redondeados.
@@ -173,8 +178,9 @@ key pública incluida en `une-api-client` si no está `UNE_FIREBASE_API_KEY`).
 
 ## 8. Notas para un futuro rediseño
 
-- El lienzo se autocentra en el recorrido (sin calles de fondo); si se quiere
-  contexto geográfico hay que traer una base (OSM/tiles) y proyectarla igual.
+- El fondo de calles usa tiles (Esri/OSM) con caché; si se quiere evitar la
+  red en producción se puede hornear un fondo por ruta. `mapaTiles.js` permite
+  inyectar `fuentes`, `dirCache` y `maxTiles` por parámetros.
 - Se dibujan **todas** las paradas, incluso las que no tiene la ruta en
   servicio (el payload de `/stops` trae las compartidas; el consumidor podría
   filtrar por `rutas`).

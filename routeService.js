@@ -9,6 +9,7 @@ import logger from './logger.js'
 import { getRutas, setRutas } from './routeCache.js'
 import { InputError, ScraperError } from './errors.js'
 import { rutaASvg } from './svgMapa.js'
+import { obtenerTilesBase } from './mapaTiles.js'
 
 import { FIFOQueue } from './utils.js'
 
@@ -142,7 +143,16 @@ export async function watchRoute(ruta) {
         `paradas: ${info.paradas.length} | unidades: ${info.camiones.length} | recorrido: ${info.ruta.recorrido.length} pts`
       )
 
-      const svg = rutaASvg(info.ruta, info.paradas, info.camiones, DIMENSIONES_MAPA)
+      // Fondo de calles (tiles OSM/Esri). Si falla, se manda el mapa plano.
+      const puntosDelMapa = [
+        ...info.ruta.recorrido,
+        ...info.paradas.map((p) => p.ubicacion),
+        ...info.camiones.filter((c) => !c.deshabilitado).map((c) => c.ubicacion),
+      ]
+      const base = await obtenerTilesBase(puntosDelMapa, DIMENSIONES_MAPA)
+      if (base) logger.info(`Mapa con fondo de calles: ${base.length} tiles`)
+
+      const svg = rutaASvg(info.ruta, info.paradas, info.camiones, DIMENSIONES_MAPA, { base })
       const filePath = path.join(
         IMAGES_DIR,
         `${nombreRutaExacto.replace(/\s+/g, '_')}_${Date.now()}.png`

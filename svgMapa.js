@@ -8,40 +8,79 @@
  * Recibe los DTOs de `une-api-client` como objetos planos: `ruta` (con
  * `recorrido`, `colorPrimario`, `nombre`), `paradas` (con `ubicacion`) y
  * `camiones` (con `ubicacion`, `rumbo`, `deshabilitado`, `id`).
+ *
+ * La proyección es **Web Mercator** (la misma que usan los tiles de OSM/Esri),
+ * así que un fondo de mapas traído por `mapaTiles.js` (capa `base` de
+ * `<image>`) cuadra exactamente bajo el recorrido. Sin fondo, se dibuja un
+ * lienzo plano `#eef3f8`.
  */
 
 /** Dimensiones por defecto del canvas de salida. */
 const DIMENSIONES_DEFECTO = { width: 800, height: 600 }
 const MARGEN = 30
 
-/** Proyección equirectangular simple (lat/lng → píxeles), escalada a un cuadro. */
+/** Web Mercator: lng → [0, 1] (normalizado). */
+export function mercatorX(lng) {
+  return (lng + 180) / 360
+}
+
+/** Web Mercator: lat → [0, 1] (normalizado). */
+export function mercatorY(lat) {
+  const rad = (lat * Math.PI) / 180
+  return (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2
+}
+
+/**
+ * Calcula la transformación que hace caber puntos Mercator normalizados
+ * `{x, y}` en el canvas: escala + offsets (offsets = px del bbox al origen).
+ * Devuelve también el bbox Mercator, útil para posicionar tiles debajo.
+ */
+export function ajustarEscala(puntos, width, height) {
+  const minX = Math.min(...puntos.map((p) => p.x))
+  const maxX = Math.max(...puntos.map((p) => p.x))
+  const minY = Math.min(...puntos.map((p) => p.y))
+  const maxY = Math.max(...puntos.map((p) => p.y))
+  const spanX = Math.max(maxX - minX, 1e-9)
+  const spanY = Math.max(maxY - minY, 1e-9)
+  const escala = Math.min((width - 2 * MARGEN) / spanX, (height - 2 * MARGEN) / spanY)
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    escala,
+    offX: MARGEN - minX * escala,
+    offY: MARGEN - minY * escala,
+  }
+}
+
+/** Proyección Web Mercator (lat/lng → píxeles), escalada a un cuadro. */
 function proyectar(puntos, width, height) {
-  const lats = puntos.map((p) => p.lat)
-  const lngs = puntos.map((p) => p.lng)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-
-  const cos = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180)
-  const spanLng = Math.max(maxLng - minLng, 1e-6)
-  const spanLat = Math.max(maxLat - minLat, 1e-6 * cos)
-
-  const escalaX = cos * spanLng
-  const escalaY = spanLat
-  const escala = Math.min((width - 2 * MARGEN) / escalaX, (height - 2 * MARGEN) / escalaY)
-
+  const t = ajustarEscala(
+    puntos.map((p) => ({ x: mercatorX(p.lng), y: mercatorY(p.lat) })),
+    width,
+    height
+  )
   return puntos.map((p) => ({
-    x: MARGEN + cos * (p.lng - minLng) * escala,
-    y: MARGEN + (maxLat - p.lat) * escala,
+    x: t.offX + mercatorX(p.lng) * t.escala,
+    y: t.offY + mercatorY(p.lat) * t.escala,
   }))
 }
 
 /**
  * Genera un string SVG con el recorrido de la ruta, sus paradas y los camiones
  * (rotados según su rumbo).
+ *
+ * `opciones.base` (opcional) es una lista de capas de fondo `{ x, y, width,
+ * height, dataUrl }` (ver `mapaTiles.js`): se dibujan primero, debajo de todo.
  */
-export function rutaASvg(ruta, paradas, camiones, dimensiones = DIMENSIONES_DEFECTO) {
+export function rutaASvg(
+  ruta,
+  paradas,
+  camiones,
+  dimensiones = DIMENSIONES_DEFECTO,
+  opciones = {}
+) {
   const { width, height } = dimensiones
   // Solo se dibujan las unidades activas en servicio (descartamos las que la
   // API marca como "disabled"/fuera de servicio, igual que el mapa oficial).
@@ -75,14 +114,23 @@ export function rutaASvg(ruta, paradas, camiones, dimensiones = DIMENSIONES_DEFE
     .map((c, i) => bus(pts[parIdx + i].x, pts[parIdx + i].y, c.rumbo, c.code))
     .join('')
 
+  const fondoSvg = opciones.base?.length
+    ? opciones.base.map(imagen).join('')
+    : '<rect width="100%" height="100%" fill="#eef3f8"/>'
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="100%" height="100%" fill="#eef3f8"/>
-  <text x="${width / 2}" y="18" font-family="sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#333">${esc(ruta.nombre)}</text>
+  ${fondoSvg}
+  <text x="${width / 2}" y="18" font-family="sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#333" stroke="#eef3f8" stroke-width="3" paint-order="stroke">${esc(ruta.nombre)}</text>
   <path d="${path}" fill="none" stroke="${ruta.colorPrimario ?? '#0088ff'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
   ${paradasSvg}
   ${camionesSvg}
 </svg>`
+}
+
+/** Capa de fondo: un tile como `<image>` embebido (data URI), bajo todo. */
+function imagen(capa) {
+  return `<image href="${capa.dataUrl}" x="${capa.x.toFixed(2)}" y="${capa.y.toFixed(2)}" width="${capa.width.toFixed(2)}" height="${capa.height.toFixed(2)}" preserveAspectRatio="none"/>`
 }
 
 function svgMarco(width, height, titulo) {
@@ -97,7 +145,6 @@ function circle(x, y, r, fill) {
   return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${fill}" stroke="#fff" stroke-width="1.5"/>`
 }
 
-/** Dibuja un bus como un rectángulo con una punta que indica la dirección. */
 /** Dibuja un bus como una flecha, usando coordenadas relativas al centro. */
 function bus(x, y, rumbo, etiqueta) {
   const angulo = rumbo ?? 0

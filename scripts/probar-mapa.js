@@ -8,6 +8,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import sharp from 'sharp'
 import { UneApiClient } from 'une-api-client'
 import { rutaASvg } from '../svgMapa.js'
+import { obtenerTilesBase } from '../mapaTiles.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -33,7 +34,15 @@ console.log(
   `paradas: ${info.paradas.length} | unidades: ${info.camiones.length} | recorrido: ${info.ruta.recorrido.length} pts`
 )
 
-const svg = rutaASvg(info.ruta, info.paradas, info.camiones, DIMENSIONES)
+const puntosDelMapa = [
+  ...info.ruta.recorrido,
+  ...info.paradas.map((p) => p.ubicacion),
+  ...info.camiones.filter((c) => !c.deshabilitado).map((c) => c.ubicacion),
+]
+const baseTiles = await obtenerTilesBase(puntosDelMapa, DIMENSIONES)
+console.log(`fondo de calles: ${baseTiles?.length ?? 0} tiles`)
+
+const svg = rutaASvg(info.ruta, info.paradas, info.camiones, DIMENSIONES, { base: baseTiles })
 
 const dir = path.join(__dirname, '..', 'camiones')
 await mkdir(dir, { recursive: true })
