@@ -116,13 +116,20 @@ export async function obtenerRutas(force = false) {
 /**
  * Genera el mapa (SVG -> PNG) de una ruta consultando la API de UNE.
  */
-export async function watchRoute(ruta) {
+export async function watchRoute(ruta, alResolverNombre) {
   return taskQueue.add(async () => {
     logger.info(`Inicio: procesando solicitud para "${ruta}"`)
 
     // Obtenemos el nombre tal cual está en la API (case sensitive) sin abrir el DOM
     const nombreRutaExacto = await buscarRutaExacta(ruta)
     logger.info(`Match encontrado en caché: "${nombreRutaExacto}"`)
+    if (alResolverNombre) {
+      try {
+        await alResolverNombre(nombreRutaExacto)
+      } catch (error) {
+        logger.warn(`No se pudo avisar el nombre de la ruta: ${error.message}`)
+      }
+    }
 
     try {
       logger.info(`Cuando una ruta se encuentra: Consultando datos de "${nombreRutaExacto}"`)

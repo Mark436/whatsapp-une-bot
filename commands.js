@@ -68,16 +68,14 @@ async function handleRuta(msg, ruta) {
     return
   }
 
-  await msg.reply(`🔍 Buscando la ruta *"${ruta}"*, espera un momento...`)
-
   let filePath
   try {
-    filePath = await watchRoute(ruta)
+    filePath = await watchRoute(ruta, async (nombre) => {
+      await msg.reply(`Buscando ruta *"${nombre}"*...`)
+    })
 
     const media = MessageMedia.fromFilePath(filePath)
-    await msg.reply(media, undefined, {
-      caption: `🚌 Ruta *${ruta}* - Estado actual`,
-    })
+    await msg.reply(media)
   } catch (error) {
     if (error instanceof InputError && error.visible) {
       await msg.reply(`❌ ${error.message}\n\n📋 *Opciones:*\n${error.rutas}`)
