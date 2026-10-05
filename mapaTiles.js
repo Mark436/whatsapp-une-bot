@@ -19,6 +19,9 @@ import { ajustarEscala, mercatorX, mercatorY } from './svgMapa.js'
 
 const MAX_TILES = 16
 const MAX_ZOOM = 18
+const MAX_TILES_CANVAS = 48
+// Tamaño máximo (px en el canvas) de un tile de 256 px: más que eso se ve borroso
+const TILE_PX_MAX = 300
 const DIR_CACHE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'camiones', 'tiles')
 
 const FUENTES = [
@@ -124,12 +127,21 @@ export async function obtenerTilesBase(puntos, dimensiones, opciones = {}) {
       dimensiones.height
     )
 
-    const zoom = elegirZoom(t, maxTiles)
+    const zoomBase = elegirZoom(t, maxTiles)
+    // Rango de tiles que cubre TODO el canvas, no solo el bbox de los puntos
+    const rangoVisible = (z) => {
+      const p = tileDeMercator(t.visMinX, t.visMinY, z)
+      const q = tileDeMercator(t.visMaxX, t.visMaxY, z)
+      return { minTx: p.x, maxTx: q.x, minTy: p.y, maxTy: q.y }
+    }
+    let zoom = Math.min(Math.max(zoomBase, Math.ceil(Math.log2(t.escala / TILE_PX_MAX))), MAX_ZOOM)
+    let r = rangoVisible(zoom)
+    while (zoom > 0 && (r.maxTx - r.minTx + 1) * (r.maxTy - r.minTy + 1) > MAX_TILES_CANVAS) {
+      zoom--
+      r = rangoVisible(zoom)
+    }
     const n = 2 ** zoom
-    const minTx = tileDeMercator(t.minX, t.minY, zoom).x
-    const maxTx = tileDeMercator(t.maxX, t.maxY, zoom).x
-    const minTy = tileDeMercator(t.minX, t.minY, zoom).y
-    const maxTy = tileDeMercator(t.maxX, t.maxY, zoom).y
+    const { minTx, maxTx, minTy, maxTy } = r
 
     const capas = []
     for (let ty = minTy; ty <= maxTy; ty++) {
